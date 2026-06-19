@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+torch
+torchvision
+segmentation-models-pytorch
+opencv-python
+numpy
+networkx
+scikit-image
+matplotlib
+pillow
