@@ -1,9 +1,9 @@
 from fastapi import FastAPI, UploadFile, File
 import cv2
 import numpy as np
-import os
 import networkx as nx
 from pydantic import BaseModel
+from .config import settings
 from .graph_engine import (
     load_graph,
     load_critical_junctions,
@@ -29,10 +29,7 @@ class RouteRequest(BaseModel):
     target_y: int
 
 
-os.makedirs(
-    "outputs",
-    exist_ok=True
-)
+settings.output_dir.mkdir(parents=True, exist_ok=True)
 
 app = FastAPI(
     title="Route Resilience API"
@@ -135,26 +132,11 @@ async def predict(
         img,
         graph_data["critical_junctions"]
     )
-    cv2.imwrite(
-        "outputs/result.jpg",
-        overlay
-    )
-    saved = cv2.imwrite(
-        "../outputs/result.jpg",
-        overlay
-    )
-    cv2.imwrite(
-        "../outputs/debug_mask.png",
-        pred_binary * 255
-    )
-    cv2.imwrite(
-        "../outputs/original.png",
-        img
-    )
-    cv2.imwrite(
-        "../outputs/morphology.jpg",
-        pred_binary * 255
-    )
+    result_path = settings.output_dir / "result.jpg"
+    saved = cv2.imwrite(str(result_path), overlay)
+    cv2.imwrite(str(settings.output_dir / "debug_mask.png"), pred_binary * 255)
+    cv2.imwrite(str(settings.output_dir / "original.png"), img)
+    cv2.imwrite(str(settings.output_dir / "morphology.jpg"), pred_binary * 255)
 
     print("Image Saved:", saved)
     print("Shape:", overlay.shape)
@@ -170,7 +152,7 @@ async def predict(
         **graph_data,
 
         "overlay":
-            "outputs/result.jpg"
+            str(result_path)
     }
 
 @app.post("/route")

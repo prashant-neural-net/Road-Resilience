@@ -1,11 +1,18 @@
+# API server
 fastapi
 uvicorn
+
+# Model inference
 torch
 torchvision
 segmentation-models-pytorch
+
+# Image and network analysis
 opencv-python
 numpy
 networkx
 scikit-image
+
+# Notebook visualisation
 matplotlib
 pillow
