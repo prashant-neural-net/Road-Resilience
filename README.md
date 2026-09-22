@@ -1,209 +1,168 @@
-# 🛰️ ISRO Road Network Resilience — Satellite Imagery Analysis
+# Road Resilience
 
-A deep-learning pipeline for **road segmentation**, **topology extraction**, **graph construction**, and **network resilience analysis** from satellite imagery using DeepLabV3+ and NetworkX.
+**Road Resilience** turns satellite imagery into a road-network view that can be explored for vulnerable junctions, routes, and the effect of a local road blockage. It combines semantic segmentation with image morphology and graph analysis, then exposes the workflow through a small FastAPI service.
 
----
+> **Status:** research/prototype project. The dataset, trained checkpoint, and precomputed graph artefacts are intentionally excluded from Git because they are large generated files.
 
-## 📌 Project Overview
+## What it does
 
-This project processes satellite images to:
-1. **Segment roads** using a fine-tuned DeepLabV3+ model
-2. **Extract road topology** via morphological skeletonization and junction detection
-3. **Build a road network graph** with 8-connectivity adjacency
-4. **Analyse network resilience** using betweenness centrality and failure simulation
-5. **Serve results via a FastAPI backend** with endpoints for prediction, routing, and blockage simulation
-
----
-
-## 🗂️ Project Structure
-
+```text
+Satellite image
+    │
+    ▼
+DeepLabV3+ road segmentation
+    │  binary road mask
+    ▼
+Morphological cleanup + skeletonisation
+    │  one-pixel road centre lines
+    ▼
+NetworkX graph construction (8-neighbour connectivity)
+    │
+    ├── critical-junction ranking (betweenness centrality)
+    ├── shortest-path routing
+    └── single-node blockage simulation
 ```
-ISRO/
-├── 01_data_exploration.ipynb         # Dataset exploration, U-Net prototype, DeepLabV3+ training
-├── 03_topology_extraction.ipynb      # Skeletonization, junction detection, connected components
-├── 04_graph_construction.ipynb       # Graph building, centrality analysis, resilience scoring
-├── 05_graph_intelligence.ipynb       # Advanced graph intelligence
+
+The `POST /predict` endpoint runs the complete flow for an uploaded image. The resulting largest connected road component becomes the in-memory graph used by `POST /route`. The project also supports loading precomputed `graph.pkl` and `critical_junctions.pkl` files for the graph-statistics and blockage endpoints.
+
+## Repository guide
+
+```text
+.
 ├── backend/
-│   ├── main.py                       # FastAPI app (predict, route, blockage simulation)
-│   ├── model.py                      # Model loading and inference
-│   ├── graph_engine.py               # Graph construction and analysis engine
-│   └── requirements.txt             # Python dependencies
-├── documentation.md                  # Notebook 01 documentation
-├── 04_graph_construction_documentation.md  # Notebook 04 documentation
-├── outputs/                          # Generated output images (git-ignored)
-└── README.md
+│   ├── config.py                  # Environment-based runtime settings
+│   ├── main.py                    # FastAPI endpoints
+│   ├── model.py                   # DeepLabV3+ loading and inference
+│   ├── graph_engine.py            # Skeleton-to-graph analysis utilities
+│   └── requirements.txt           # Python dependencies, grouped by purpose
+├── main.py                        # Application entry point
+├── .env.example                   # Documented local configuration template
+├── 01_data_exploration.ipynb      # Dataset exploration and model training work
+├── 03_topology_extraction.ipynb   # Skeletonisation and junction extraction work
+├── 04_graph_construction.ipynb    # Graph construction and resilience analysis
+├── 05_graph_intelligence.ipynb    # Further graph analysis experiments
+├── documentation.md               # Detailed segmentation notebook notes
+└── 04_graph_construction_documentation.md
 ```
 
----
+## Quick start
 
-## 🧠 Model Architecture
+### 1. Create a Python environment
 
-| Component | Details |
-|-----------|---------|
-| Architecture | DeepLabV3+ |
-| Encoder | ResNet-50 |
-| Pre-trained weights | ImageNet |
-| Input | 512 × 512 RGB satellite image |
-| Output | Binary road mask |
-| Training images | 5,000 |
-| Inference threshold | 0.2 |
-| Hardware | Apple MPS / CUDA / CPU |
-
----
-
-## 🔬 Pipeline
-
-```
-Satellite Image (512×512)
-        ↓
-DeepLabV3+ Inference  →  Binary Road Mask
-        ↓
-binary_dilation (gap filling)
-        ↓
-Morphological Skeletonization  →  1-pixel road centerline
-        ↓
-remove_small_objects  →  Clean Skeleton
-        ↓
-Convolution-based Junction Detection  →  Road Junctions
-        ↓
-NetworkX Graph Construction
-  Nodes  = skeleton pixels
-  Edges  = 8-neighbor adjacency
-        ↓
-Connected Components Analysis
-        ↓
-Largest Component  →  Betweenness Centrality
-        ↓
-Critical Node Identification
-        ↓
-Failure Simulation  →  Resilience Score
-```
-
----
-
-## 📊 Key Results (Sample Image `63019`)
-
-| Metric | Value |
-|--------|-------|
-| Road pixels (mask) | 5,696 |
-| Skeleton pixels (raw) | 736 |
-| Clean skeleton pixels | 454 |
-| Junctions detected | 432 |
-| Connected components | 4 |
-| Most critical node | (17, 197) |
-| Betweenness centrality | 0.5013 |
-| Resilience score | **≈ 0.499** |
-
----
-
-## 🚀 FastAPI Backend
-
-### Run the server
+Python 3.10 or later is recommended.
 
 ```bash
-cd backend
-pip install -r requirements.txt
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
-```
-
-### API Endpoints
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/` | Health check |
-| GET | `/health` | Server status |
-| GET | `/graph-stats` | Node/edge counts |
-| GET | `/critical-junctions` | Top-10 critical nodes with scores |
-| GET | `/resilience` | Network resilience metrics |
-| POST | `/predict` | Upload image → road mask + graph analysis |
-| POST | `/route` | Find shortest path between two points |
-| POST | `/simulate-blockage` | Simulate road failure at a junction |
-
-### Example: Predict road mask
-
-```bash
-curl -X POST "http://localhost:8000/predict" \
-     -F "file=@satellite_image.jpg"
-```
-
-### Example: Simulate blockage
-
-```bash
-curl -X POST "http://localhost:8000/simulate-blockage" \
-     -H "Content-Type: application/json" \
-     -d '{"junction_x": 17, "junction_y": 197}'
-```
-
----
-
-## 🛠️ Installation
-
-```bash
-git clone https://github.com/<your-username>/isro-road-resilience.git
-cd isro-road-resilience
+git clone <repository-url>
+cd Road-Resilience
 
 python -m venv .venv
-source .venv/bin/activate          # Windows: .venv\Scripts\activate
-
+source .venv/bin/activate              # Windows: .venv\Scripts\activate
 pip install -r backend/requirements.txt
 ```
 
-### Additional dependencies for notebooks
+### 2. Provide the model checkpoint
 
-```bash
-pip install jupyter notebook
-pip install scikit-image scipy networkx
+Download or train a compatible DeepLabV3+ ResNet-34 checkpoint and place it at the repository root as:
+
+```text
+deeplabv3plus_road.pth
 ```
 
----
+The checkpoint is required when the API imports `backend.model`. It is git-ignored and is not supplied by this repository.
 
-## 📦 Dataset
+### 3. Configure the runtime (optional)
 
-This project uses the **[DeepGlobe Road Extraction Dataset](https://www.kaggle.com/datasets/balraj98/deepglobe-road-extraction-dataset)**.
+Copy the example configuration and load it into your shell using your preferred dotenv tool, or export the variables directly:
 
-- **6,226** matched satellite-mask pairs
-- Image size: 1024 × 1024 (resized to 512 × 512 for training)
-- File naming: `<id>_sat.jpg` / `<id>_mask.png`
+```bash
+cp .env.example .env
+export ROAD_RESILIENCE_MODEL_PATH="$(pwd)/deeplabv3plus_road.pth"
+export ROAD_RESILIENCE_OUTPUT_DIR="$(pwd)/outputs"
+```
 
-> ⚠️ Dataset and model weights are **not included** in this repository (too large for GitHub). Download the dataset from Kaggle and place in `train/`, `test/`, `valid/` directories.
+| Variable | Default | Purpose |
+|---|---|---|
+| `ROAD_RESILIENCE_MODEL_PATH` | `./deeplabv3plus_road.pth` | Path to the model checkpoint. |
+| `ROAD_RESILIENCE_OUTPUT_DIR` | `./outputs` | Directory for the overlay, mask, and source image generated by `/predict`. |
+| `ROAD_RESILIENCE_DEVICE` | `auto` | Inference device: `auto`, `cpu`, `mps`, or `cuda`. `auto` prefers Apple MPS, then CUDA, then CPU. |
+| `ROAD_RESILIENCE_THRESHOLD` | `0.5` | Probability threshold used to convert model output to a binary road mask. |
 
----
+`.env` is deliberately ignored. The application reads these variables from its process environment; copying the template documents the settings but does not load it automatically.
 
-## 📁 Model Weights
+### 4. Start the API
 
-Download pre-trained weights separately and place in the project root:
+Run this command from the repository root:
 
-| File | Encoder | Training Images |
-|------|---------|----------------|
-| `deeplabv3_resnet50_5000img.pth` | ResNet-50 | 5,000 |
-| `deeplabv3plus_road.pth` | ResNet-34 | 3,000 |
+```bash
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
+```
 
----
+Open the interactive API documentation at [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs). A lightweight health check is available at `GET /health`.
 
-## 📚 Notebooks
+## API workflow
 
-| Notebook | Description |
-|----------|-------------|
-| `01_data_exploration.ipynb` | Data loading, U-Net baseline, DeepLabV3+ training (10 epochs), IoU/Dice evaluation |
-| `03_topology_extraction.ipynb` | Gap filling, skeletonization, junction detection, connected component counting |
-| `04_graph_construction.ipynb` | Full graph pipeline, betweenness centrality, critical node analysis, resilience scoring |
-| `05_graph_intelligence.ipynb` | Advanced graph-based intelligence and routing |
+### Analyse an image
 
----
+```bash
+curl -X POST http://127.0.0.1:8000/predict \
+  -F "file=@/path/to/satellite-image.jpg"
+```
 
-## 🔧 Tech Stack
+The response includes road-pixel coverage, graph size, detected junctions, resilience score, and up to ten spatially separated critical junctions. The service writes `result.jpg`, `debug_mask.png`, `original.png`, and `morphology.jpg` to the configured output directory.
 
-| Layer | Technology |
-|-------|-----------|
-| Deep Learning | PyTorch, segmentation-models-pytorch |
-| Image Processing | OpenCV, scikit-image, SciPy |
-| Graph Analysis | NetworkX |
-| Backend API | FastAPI, Uvicorn |
-| Visualisation | Matplotlib |
-| Hardware | Apple MPS (M-series) / CUDA |
+### Request a route
 
----
+Call `/predict` first, then send image-coordinate pairs. The API snaps each requested coordinate to the nearest graph node and returns the first 50 nodes in the shortest path.
 
-## 📄 License
+```bash
+curl -X POST http://127.0.0.1:8000/route \
+  -H 'Content-Type: application/json' \
+  -d '{"source_x": 40, "source_y": 80, "target_x": 350, "target_y": 410}'
+```
 
-MIT License — see [LICENSE](LICENSE) for details.
+### Simulate a blockage
+
+`/simulate-blockage` uses the saved `graph.pkl` artefact, removes the nearest graph node to the supplied coordinate, and compares connected-component counts before and after removal.
+
+```bash
+curl -X POST http://127.0.0.1:8000/simulate-blockage \
+  -H 'Content-Type: application/json' \
+  -d '{"junction_x": 17, "junction_y": 197}'
+```
+
+## Endpoint reference
+
+| Method | Endpoint | Use |
+|---|---|---|
+| `GET` | `/` | Basic service message. |
+| `GET` | `/health` | Health status. |
+| `POST` | `/predict` | Segment an uploaded satellite image and build an in-memory road graph. |
+| `POST` | `/route` | Find a shortest path in the graph created by the latest prediction. |
+| `POST` | `/simulate-blockage` | Measure the impact of removing a node from `graph.pkl`. |
+| `GET` | `/graph-stats` | Read node and edge counts from `graph.pkl`. |
+| `GET` | `/critical-junctions` | Return top critical nodes from `critical_junctions.pkl`. |
+| `GET` | `/resilience` | Return the prototype's current static resilience example. |
+
+## Data and artefacts
+
+The notebooks use the [DeepGlobe Road Extraction Dataset](https://www.kaggle.com/datasets/balraj98/deepglobe-road-extraction-dataset). Expected filenames are `<id>_sat.jpg` for source imagery and `<id>_mask.png` for binary road masks. Keep data in the git-ignored `train/`, `valid/`, and `test/` directories.
+
+Generated assets are excluded from version control:
+
+| Artefact | Used by |
+|---|---|
+| `deeplabv3plus_road.pth` | Model inference. |
+| `graph.pkl` | `/graph-stats` and `/simulate-blockage`. |
+| `critical_junctions.pkl` | `/critical-junctions`. |
+| `outputs/` | Images generated by `/predict`. |
+
+## Development notes
+
+- The API currently keeps only the latest prediction graph in memory. Restarting the server clears it.
+- Coordinates are image pixels represented as `(x, y)` pairs.
+- The graph is constructed from skeleton pixels using 8-neighbour adjacency; centrality is calculated on the largest connected component.
+- For the modelling and graph-method details, see [`documentation.md`](documentation.md) and [`04_graph_construction_documentation.md`](04_graph_construction_documentation.md).
+
+## Technology
+
+FastAPI · Uvicorn · PyTorch · segmentation-models-pytorch · OpenCV · scikit-image · NetworkX · NumPy

@@ -1,15 +1,23 @@
-import os
 import torch
 import cv2
 import numpy as np
 import segmentation_models_pytorch as smp
+from .config import settings
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-CHECKPOINT_PATH = os.path.abspath(
-    os.path.join(BASE_DIR, "..", "deeplabv3plus_road.pth")
-)
 
-device = "mps" if torch.backends.mps.is_available() else "cpu"
+def resolve_device() -> str:
+    """Choose the configured device, or the safest available default."""
+
+    if settings.device != "auto":
+        return settings.device
+    if torch.backends.mps.is_available():
+        return "mps"
+    if torch.cuda.is_available():
+        return "cuda"
+    return "cpu"
+
+
+device = resolve_device()
 
 model = smp.DeepLabV3Plus(
     encoder_name="resnet34",
@@ -20,7 +28,7 @@ model = smp.DeepLabV3Plus(
 
 model.load_state_dict(
     torch.load(
-        CHECKPOINT_PATH,
+        settings.model_checkpoint,
         map_location=device
     )
 )
@@ -58,7 +66,7 @@ def predict_mask(img):
     pred = pred.squeeze().cpu().numpy()
 
     pred_binary = (
-        pred > 0.5
+        pred > settings.prediction_threshold
     ).astype(np.uint8)
 
     return pred_binary
